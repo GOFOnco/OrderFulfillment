@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <!-- SheetJS dari CDNjs (lebih stabil) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -38,6 +39,7 @@
         .tab-content { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .filter-select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+        .drag-over { border-color: #0f766e !important; background-color: #f0fdfa !important; }
     </style>
 </head>
 <body class="p-4 md:p-6 lg:p-8 min-h-screen">
@@ -279,11 +281,11 @@
                 <h2 class="text-2xl font-bold text-slate-800">Upload Data Excel / CSV</h2>
                 <p class="text-slate-500 text-sm mt-2">Pastikan header kolom sesuai format sistem.</p>
 
-                <div class="mt-8 border-2 border-dashed border-slate-300 rounded-2xl p-10 cursor-pointer hover:border-brand-teal hover:bg-teal-50/30 transition-all duration-300 group" onclick="document.getElementById('fileInput').click()">
+                <div id="dropZone" class="mt-8 border-2 border-dashed border-slate-300 rounded-2xl p-10 cursor-pointer hover:border-brand-teal hover:bg-teal-50/30 transition-all duration-300 group">
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
-                    <i class="fa-solid fa-file-excel text-4xl text-green-600 mb-3 group-hover:scale-110 transition-transform"></i>
-                    <p class="font-semibold text-slate-700">Klik untuk memilih file</p>
-                    <p class="text-xs text-slate-400 mt-1">atau drag and drop file ke sini</p>
+                    <i class="fa-solid fa-file-excel text-4xl text-green-600 mb-3 group-hover:scale-110 transition-transform pointer-events-none"></i>
+                    <p class="font-semibold text-slate-700 pointer-events-none">Klik untuk memilih file</p>
+                    <p class="text-xs text-slate-400 mt-1 pointer-events-none">atau drag and drop file ke sini</p>
                 </div>
 
                 <div id="fileInfo" class="hidden mt-4 bg-blue-50 text-blue-700 p-3 rounded-xl text-sm border border-blue-200 flex items-center justify-center gap-2">
@@ -293,6 +295,10 @@
                 <button type="button" id="btnUpload" onclick="processUpload()" class="mt-8 w-full bg-brand-teal text-white font-bold py-4 rounded-xl hover:bg-teal-800 transition-all duration-300 shadow-lg shadow-teal-500/30 flex items-center justify-center gap-2 opacity-50 cursor-not-allowed" disabled>
                     <i class="fa-solid fa-upload"></i> Proses Upload
                 </button>
+
+                <p class="text-xs text-slate-400 mt-4">
+                    <i class="fa-solid fa-info-circle"></i> Mendukung format: .xlsx, .xls, .csv
+                </p>
             </div>
         </div>
 
@@ -303,6 +309,7 @@
         var rawData = [];
         var filteredData = [];
         var charts = { of: null, rilis: null, batch: null };
+        var selectedFile = null;
 
         // ==================== NAVIGASI TAB ====================
         function switchTab(tabName) {
@@ -324,25 +331,75 @@
             }
         }
 
-        // ==================== FILE INPUT HANDLER ====================
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            var file = e.target.files[0];
-            if (file) {
-                document.getElementById('fileName').textContent = file.name;
-                document.getElementById('fileInfo').classList.remove('hidden');
-                var btn = document.getElementById('btnUpload');
-                btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        // ==================== FILE HANDLING ====================
+        var fileInput = document.getElementById('fileInput');
+        var dropZone = document.getElementById('dropZone');
+
+        // Klik drop zone = buka file picker
+        dropZone.addEventListener('click', function(e) {
+            // Hindari double trigger kalau yang diklik adalah input file itu sendiri
+            if (e.target.id !== 'fileInput') {
+                fileInput.click();
             }
         });
 
+        // File selected via input
+        fileInput.addEventListener('change', function(e) {
+            handleFile(e.target.files[0]);
+        });
+
+        // Drag & Drop events
+        ['dragenter', 'dragover'].forEach(function(eventName) {
+            dropZone.addEventListener(eventName, function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(function(eventName) {
+            dropZone.addEventListener(eventName, function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', function(e) {
+            var files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files; // assign ke input
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+            selectedFile = file;
+            document.getElementById('fileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+            document.getElementById('fileInfo').classList.remove('hidden');
+            var btn = document.getElementById('btnUpload');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            console.log('File selected:', file.name);
+        }
+
         // ==================== UPLOAD LOGIC ====================
         function processUpload() {
-            var fileInput = document.getElementById('fileInput');
-            var file = fileInput.files[0];
-            if (!file) { alert("Pilih file terlebih dahulu!"); return; }
+            if (!selectedFile) { alert("Pilih file terlebih dahulu!"); return; }
+
+            // Cek apakah XLSX sudah dimuat
+            if (typeof XLSX === 'undefined') {
+                alert("Library Excel belum termuat. Cek koneksi internet Anda, lalu refresh halaman.");
+                return;
+            }
 
             var reader = new FileReader();
+            
+            reader.onerror = function() {
+                alert("Gagal membaca file. Coba lagi.");
+            };
+
             reader.onload = function(e) {
                 try {
                     var data = new Uint8Array(e.target.result);
@@ -350,65 +407,88 @@
                     var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                     var jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 
-                    if (jsonData.length === 0) { alert("File kosong atau format salah."); return; }
+                    console.log('Total baris terbaca:', jsonData.length);
+                    console.log('Contoh data baris pertama:', jsonData[0]);
+
+                    if (jsonData.length === 0) {
+                        alert("File kosong atau format tidak sesuai. Pastikan baris pertama adalah header.");
+                        return;
+                    }
+
+                    // Helper: ambil nilai dari berbagai kemungkinan nama kolom
+                    function getVal(row, keys) {
+                        for (var i = 0; i < keys.length; i++) {
+                            if (row[keys[i]] !== undefined && row[keys[i]] !== "") {
+                                return row[keys[i]];
+                            }
+                        }
+                        return "";
+                    }
 
                     rawData = jsonData.map(function(row, index) {
                         return {
                             id: index,
-                            bulan: String(row["Bulan"] || row["bulan"] || "-"),
-                            produk: String(row["Produk"] || row["produk"] || "-"),
-                            batch: String(row["BATCH No."] || row["batch"] || row["BATCH"] || "-"),
-                            estFg: String(row["Est FG"] || "-"),
-                            planQty: parseFloat(row["Plan Qty"]) || 0,
-                            bppDate: String(row["BPP Date"] || row["bpp_date"] || ""),
-                            bppQty: parseFloat(row["BPP Qty"]) || 0,
-                            releaseDate: String(row["Release Date"] || row["release_date"] || ""),
-                            releaseQty: parseFloat(row["Release Qty"]) || 0,
-                            shippingDate: String(row["Shipping Date"] || row["shipping_date"] || ""),
-                            shippingQty: parseFloat(row["Shipping Qty"]) || 0
+                            bulan: String(getVal(row, ["Bulan", "bulan", "BULAN", "Month"]) || "-"),
+                            produk: String(getVal(row, ["Produk", "produk", "PRODUK", "Product", "Kode Produk"]) || "-"),
+                            batch: String(getVal(row, ["BATCH No.", "BATCH No", "Batch", "batch", "BATCH", "No Batch"]) || "-"),
+                            estFg: String(getVal(row, ["Est FG", "est_fg", "EstFG"]) || "-"),
+                            planQty: parseFloat(getVal(row, ["Plan Qty", "plan_qty", "PlanQty", "Target"])) || 0,
+                            bppDate: String(getVal(row, ["BPP Date", "bpp_date", "BPPDate", "Tgl BPP"]) || ""),
+                            bppQty: parseFloat(getVal(row, ["BPP Qty", "bpp_qty", "BPPQty", "Qty BPP"])) || 0,
+                            releaseDate: String(getVal(row, ["Release Date", "release_date", "ReleaseDate", "Tgl Release"]) || ""),
+                            releaseQty: parseFloat(getVal(row, ["Release Qty", "release_qty", "ReleaseQty", "Qty Rilis"])) || 0,
+                            shippingDate: String(getVal(row, ["Shipping Date", "shipping_date", "ShippingDate", "Tgl Shipping"]) || ""),
+                            shippingQty: parseFloat(getVal(row, ["Shipping Qty", "shipping_qty", "ShippingQty", "Qty Shipping"])) || 0
                         };
                     });
+
+                    console.log('Data setelah parsing:', rawData.slice(0, 3));
 
                     populateFilters();
                     resetFilters();
                     alert("Berhasil! " + rawData.length + " baris data telah dimuat.");
                     switchTab('dashboard');
                 } catch (err) {
-                    alert("Error membaca file: " + err.message);
+                    console.error('Error:', err);
+                    alert("Error membaca file: " + err.message + "\n\nCek console browser (F12) untuk detail.");
                 }
             };
-            reader.readAsArrayBuffer(file);
+
+            reader.readAsArrayBuffer(selectedFile);
         }
 
         // ==================== POPULATE FILTERS ====================
         function populateFilters() {
             var weekSet = {};
             var productSet = {};
-            var lineSet = {};
 
             rawData.forEach(function(d) {
                 var w = getWeekFromDate(d.bppDate || d.releaseDate || d.shippingDate);
                 if (w) weekSet[w] = true;
-                if (d.produk && d.produk !== "-") {
-                    productSet[d.produk] = true;
-                    lineSet[d.produk] = true;
-                }
+                if (d.produk && d.produk !== "-") productSet[d.produk] = true;
             });
 
             var weeks = Object.keys(weekSet).sort();
             var products = Object.keys(productSet).sort();
-            var lines = Object.keys(lineSet).sort();
 
             document.getElementById('filterWeek').innerHTML = '<option value="">Semua Week</option>' + weeks.map(function(w) { return '<option value="' + w + '">' + w + '</option>'; }).join('');
             document.getElementById('filterProduct').innerHTML = '<option value="">Semua Kode Produk</option>' + products.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join('');
-            document.getElementById('filterLine').innerHTML = '<option value="">Semua Line Produksi</option>' + lines.map(function(l) { return '<option value="' + l + '">' + l + '</option>'; }).join('');
+            document.getElementById('filterLine').innerHTML = '<option value="">Semua Line Produksi</option>' + products.map(function(l) { return '<option value="' + l + '">' + l + '</option>'; }).join('');
         }
 
         // ==================== HELPER: WEEK ====================
         function getWeekFromDate(dateStr) {
             if (!dateStr || dateStr === "-") return "";
+            // Coba parse format umum
             var date = new Date(dateStr);
-            if (isNaN(date.getTime())) return "";
+            if (isNaN(date.getTime())) {
+                // Coba format DD/MM/YYYY atau DD-MM-YYYY
+                var parts = String(dateStr).split(/[\/\-]/);
+                if (parts.length === 3) {
+                    date = new Date(parts[2], parts[1] - 1, parts[0]);
+                }
+                if (isNaN(date.getTime())) return "";
+            }
             var firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
             var weekNum = Math.ceil((date.getDate() + firstDay.getDay()) / 7);
             return "W" + weekNum;
@@ -573,7 +653,6 @@
             var weeks = Object.keys(weekSet).sort();
             var labels = weeks.length > 0 ? weeks : ['Belum ada data'];
 
-            // Chart 1: Trend %OF
             var ofData = weeks.length > 0 ? weeks.map(function(w) {
                 var wd = filteredData.filter(function(d) { return getWeekFromDate(d.bppDate || d.releaseDate || d.shippingDate) === w; });
                 var target = wd.reduce(function(s, d) { return s + d.planQty; }, 0);
@@ -601,7 +680,6 @@
                 }
             });
 
-            // Chart 2: Rilis vs Total BN
             var rilisData = weeks.length > 0 ? weeks.map(function(w) { return filteredData.filter(function(d) { return getWeekFromDate(d.releaseDate) === w && d.releaseQty > 0; }).length; }) : [0];
             var totalBnData = weeks.length > 0 ? weeks.map(function(w) { return filteredData.filter(function(d) { return getWeekFromDate(d.bppDate) === w; }).length; }) : [0];
 
@@ -625,7 +703,6 @@
                 }
             });
 
-            // Chart 3: Batch Progress
             charts.batch = new Chart(document.getElementById('chartBatch').getContext('2d'), {
                 type: 'bar',
                 data: {
@@ -652,7 +729,19 @@
         document.addEventListener('DOMContentLoaded', function() {
             Chart.defaults.font.family = "'Inter', sans-serif";
             Chart.defaults.color = '#64748b';
-            // Render dashboard kosong di awal
+
+            // Cek library
+            setTimeout(function() {
+                if (typeof XLSX === 'undefined') {
+                    console.error('SheetJS gagal dimuat. Cek koneksi internet.');
+                } else {
+                    console.log('SheetJS siap digunakan.');
+                }
+                if (typeof Chart === 'undefined') {
+                    console.error('Chart.js gagal dimuat.');
+                }
+            }, 1000);
+
             renderDashboard();
         });
     </script>
