@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Fulfillment Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            teal: '#0f766e',
+                            tealLight: '#14b8a6',
+                            orange: '#f97316',
+                            amber: '#f59e0b',
+                            green: '#10b981',
+                            blue: '#0284c7',
+                            dark: '#0f172a',
+                            gray: '#f1f5f9'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f8fafc; color: #1e293b; }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.15); }
+        .table-modern th { background-color: #f8fafc; color: #64748b; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .table-modern td { border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+        .table-modern tr:hover { background-color: #f8fafc; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .tab-content { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="p-4 md:p-6 lg:p-8 min-h-screen">
+
+    <!-- HEADER & NAVIGASI -->
+    <header class="bg-gradient-to-r from-brand-teal to-brand-tealLight text-white p-4 md:p-5 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 mb-6 sticky top-4 z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-white/20 p-2 rounded-xl">
+                <i class="fa-solid fa-boxes-packing text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Order Fulfillment</h1>
+                <p class="text-xs text-teal-100 opacity-80">Digitalization System</p>
+            </div>
+        </div>
+        <nav class="flex bg-white/10 p-1 rounded-xl w-full md:w-auto">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-white text-brand-teal shadow-sm">
+                <i class="fa-solid fa-chart-pie mr-2"></i>Dashboard
+            </button>
+            <button onclick="switchTab('upload')" id="nav-upload" class="flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 text-white hover:bg-white/10">
+                <i class="fa-solid fa-file-excel mr-2"></i>Upload Data
+            </button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- ================= TAB DASHBOARD ================= -->
+        <div id="tab-dashboard" class="tab-content">
+            
+            <!-- FILTER BAR -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap items-center gap-3 mb-6">
+                <span class="text-sm font-bold text-slate-700 flex items-center gap-2 mr-2">
+                    <i class="fa-solid fa-filter text-brand-orange"></i> Filter:
+                </span>
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-slate-100 transition">
+                    <i class="fa-regular fa-calendar text-brand-teal"></i> 1 Sep 2026 - 30 Sep 2026 <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-slate-100 transition">
+                    <i class="fa-regular fa-calendar-check text-brand-teal"></i> Week <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-industry text-brand-teal"></i> Line Produksi <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-tags text-brand-teal"></i> Kode Produk <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                </div>
+            </div>
+
+            <!-- TITLE -->
+            <div class="text-center mb-8">
+                <h2 class="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight flex items-center justify-center gap-3">
+                    ORDER FULFILLMENT 
+                    <span class="text-slate-300 text-2xl"><i class="fa-solid fa-cart-plus"></i></span>
+                    <span class="text-brand-green text-2xl"><i class="fa-solid fa-circle-check"></i></span>
+                </h2>
+                <p class="text-slate-500 text-sm mt-2">Ringkasan status pemenuhan pesanan berdasarkan BPP, Rilis, dan Shipping.</p>
+            </div>
+
+            <!-- KPI CARDS -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                <!-- Card 1: %BPP -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden card-hover">
+                    <div class="p-5 border-b border-slate-100 bg-gradient-to-br from-orange-50 to-white">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">%BPP</p>
+                                <p class="text-3xl font-extrabold text-slate-800 mt-1">73,8%</p>
+                            </div>
+                            <div class="bg-orange-100 p-2 rounded-lg text-brand-orange">
+                                <i class="fa-solid fa-box-open text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <table class="w-full text-sm">
+                            <tr class="border-b border-slate-100">
+                                <td class="py-2 text-slate-500">BN belum BPP</td>
+                                <td class="text-right font-bold text-slate-800">21</td>
+                            </tr>
+                            <tr class="border-b border-slate-100">
+                                <td class="py-2 text-slate-500">BN Sudah BPP</td>
+                                <td class="text-right font-bold text-slate-800">59</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 font-bold text-slate-700">Jumlah BN</td>
+                                <td class="text-right font-extrabold text-brand-orange">80</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Card 2: %Rilis -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden card-hover">
+                    <div class="p-5 border-b border-slate-100 bg-gradient-to-br from-amber-50 to-white">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">%Rilis</p>
+                                <p class="text-3xl font-extrabold text-slate-800 mt-1">45,0%</p>
+                            </div>
+                            <div class="bg-amber-100 p-2 rounded-lg text-brand-amber">
+                                <i class="fa-solid fa-clipboard-check text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <table class="w-full text-sm">
+                            <tr class="border-b border-slate-100">
+                                <td class="py-2 text-slate-500">BN belum Rilis</td>
+                                <td class="text-right font-bold text-slate-800">44</td>
+                            </tr>
+                            <tr class="border-b border-slate-100">
+                                <td class="py-2 text-slate-500">BN Sudah Rilis</td>
+                                <td class="text-right font-bold text-slate-800">36</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 font-bold text-slate-700">Jumlah BN</td>
+                                <td class="text-right font-extrabold text-brand-amber">80</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Card 3: %Shipping -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden card-hover">
+                    <div class="p-5 border-b border-slate-100 bg-gradient-to-br from-emerald-50 to-white">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">%Shipping</p>
+                                <p class="text-3xl font-extrabold text-slate-800 mt-1">36,3%</p>
+                            </div>
+                            <div class="bg-emerald-100 p-2 rounded-lg text-brand-green">
+                                <i class="fa-solid fa-truck-fast text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <table class="w-full text-sm">
+                            <tr class="border-b border-slate-100">
+                                <td class="py-2 text-slate-500">BN Belum Shipping</td>
+                                <td class="text-right font-bold text-slate-800">51</td>
+                            </tr>
+                            <tr class="border-b border-slate-100">
+                                <td class="py-2 text-slate-500">BN Sudah Shipping</td>
+                                <td class="text-right font-bold text-slate-800">29</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 font-bold text-slate-700">Jumlah BN</td>
+                                <td class="text-right font-extrabold text-brand-green">80</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHART ROW 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-line text-brand-orange"></i> Trend %OF</h3>
+                    <div class="h-48"><canvas id="chartOF"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-bar text-brand-blue"></i> Rilis vs Total BN</h3>
+                    <div class="h-48"><canvas id="chartRilis"></canvas></div>
+                </div>
+            </div>
+
+            <!-- CHART ROW 2 -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                <div class="flex flex-wrap gap-4 mb-4 text-xs font-semibold">
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500"></span> Target</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-400"></span> Sudah BPP</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-green-500"></span> Sudah Rilis</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Sudah Shipping</span>
+                </div>
+                <div class="h-56"><canvas id="chartBatch"></canvas></div>
+            </div>
+
+            <!-- TABEL ROW 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+                <!-- Pending BPP -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-hourglass-half text-brand-orange mr-2"></i> Pending BPP</h3>
+                        <span class="text-xs bg-orange-100 text-brand-orange px-2 py-1 rounded-full font-bold">21 Items</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-72">
+                        <table class="w-full table-modern">
+                            <thead class="sticky top-0 bg-white shadow-sm"><tr><th class="px-4 py-3 text-left">Week</th><th class="px-4 py-3 text-left">Kode Produk</th><th class="px-4 py-3 text-left">BN</th></tr></thead>
+                            <tbody>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">TRHTA</td><td class="px-4 py-3 text-slate-500">TRHTA60337</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">TRHTA</td><td class="px-4 py-3 text-slate-500">TRHTA60338</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">TTFEF</td><td class="px-4 py-3 text-slate-500">TTFEF61977</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">VVCND</td><td class="px-4 py-3 text-slate-500">VVCND60130</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">VRXTB</td><td class="px-4 py-3 text-slate-500">VRXTB60173</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">TTFEF</td><td class="px-4 py-3 text-slate-500">TTFEF61978</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pending Release -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-flask text-brand-amber mr-2"></i> Pending Release</h3>
+                        <span class="text-xs bg-amber-100 text-brand-amber px-2 py-1 rounded-full font-bold">23 Items</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-72">
+                        <table class="w-full table-modern">
+                            <thead class="sticky top-0 bg-white shadow-sm"><tr><th class="px-4 py-3 text-left">Week</th><th class="px-4 py-3 text-left">Produk</th><th class="px-4 py-3 text-left">BN</th><th class="px-4 py-3 text-left">BPP Date</th><th class="px-4 py-3 text-left">Est. LWS</th></tr></thead>
+                            <tbody>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">TTFEF</td><td class="px-4 py-3 text-slate-500">TTFEF61973</td><td class="px-4 py-3 text-slate-500">14 Sep 2026</td><td class="px-4 py-3 text-slate-500">19 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">VRXTC</td><td class="px-4 py-3 text-slate-500">VRXTC60199</td><td class="px-4 py-3 text-slate-500">14 Sep 2026</td><td class="px-4 py-3 text-slate-500">22 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">TTFEF</td><td class="px-4 py-3 text-slate-500">TTFEF61972</td><td class="px-4 py-3 text-slate-500">14 Sep 2026</td><td class="px-4 py-3 text-slate-500">17 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">VDXBB</td><td class="px-4 py-3 text-slate-500">VDXBB60239</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td><td class="px-4 py-3 text-slate-500">23 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W4</td><td class="px-4 py-3 font-medium">VDXBB</td><td class="px-4 py-3 text-slate-500">VDXBB60238</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td><td class="px-4 py-3 text-slate-500">23 Sep 2026</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABEL ROW 2 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+                <!-- Pending Shipping -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-truck-fast text-brand-blue mr-2"></i> Pending Shipping</h3>
+                        <span class="text-xs bg-blue-100 text-brand-blue px-2 py-1 rounded-full font-bold">7 Items</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-72">
+                        <table class="w-full table-modern">
+                            <thead class="sticky top-0 bg-white shadow-sm"><tr><th class="px-4 py-3 text-left">Week</th><th class="px-4 py-3 text-left">Produk</th><th class="px-4 py-3 text-left">BN</th><th class="px-4 py-3 text-left">Release Date</th></tr></thead>
+                            <tbody>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">TTFEF</td><td class="px-4 py-3 text-slate-500">TTFEF61968</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">VMTTB</td><td class="px-4 py-3 text-slate-500">VMTTB60102</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">VCPTB</td><td class="px-4 py-3 text-slate-500">VCPTB60221</td><td class="px-4 py-3 text-slate-500">14 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">VCRCB</td><td class="px-4 py-3 text-slate-500">VCRCB60305</td><td class="px-4 py-3 text-slate-500">14 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W2</td><td class="px-4 py-3 font-medium">VDXBB</td><td class="px-4 py-3 text-slate-500">VDXBB60236</td><td class="px-4 py-3 text-slate-500">9 Sep 2026</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Produk Selesai -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50/50">
+                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-box-open text-brand-green mr-2"></i> Produk Selesai</h3>
+                        <span class="text-xs bg-emerald-100 text-brand-green px-2 py-1 rounded-full font-bold">29 Items</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-72">
+                        <table class="w-full table-modern">
+                            <thead class="sticky top-0 bg-white shadow-sm"><tr><th class="px-4 py-3 text-left">Week</th><th class="px-4 py-3 text-left">Produk</th><th class="px-4 py-3 text-left">BN</th><th class="px-4 py-3 text-left">Shipping Date</th></tr></thead>
+                            <tbody>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">VCRCB</td><td class="px-4 py-3 text-slate-500">VCRCB60304</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">TCABA</td><td class="px-4 py-3 text-slate-500">TCABA60268</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">TCABA</td><td class="px-4 py-3 text-slate-500">TCABA60270</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">TCABA</td><td class="px-4 py-3 text-slate-500">TCABA60271</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                                <tr><td class="px-4 py-3">W3</td><td class="px-4 py-3 font-medium">TCABA</td><td class="px-4 py-3 text-slate-500">TCABA60269</td><td class="px-4 py-3 text-slate-500">15 Sep 2026</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABEL PENCAPAIAN -->
+            <div class="grid grid-cols-1 gap-5">
+                <!-- Berdasarkan Unit Jual -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-chart-simple text-brand-teal mr-2"></i> Pencapaian %OF berdasarkan Unit Jual (Dus)</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full table-modern">
+                            <thead><tr><th class="px-4 py-3 text-left">Bulan</th><th class="px-4 py-3 text-right">Total BN</th><th class="px-4 py-3 text-right">Qty Target</th><th class="px-4 py-3 text-right">Qty BPP</th><th class="px-4 py-3 text-right">%BPP</th><th class="px-4 py-3 text-right">Qty Rilis</th><th class="px-4 py-3 text-right">%Rilis</th><th class="px-4 py-3 text-right">Qty Shipping</th><th class="px-4 py-3 text-right">%OF Total</th></tr></thead>
+                            <tbody>
+                                <tr><td class="px-4 py-3">Sep 2026</td><td class="px-4 py-3 text-right">80</td><td class="px-4 py-3 text-right">196.373</td><td class="px-4 py-3 text-right">152.436</td><td class="px-4 py-3 text-right font-medium text-brand-orange">67,83%</td><td class="px-4 py-3 text-right">65.844</td><td class="px-4 py-3 text-right font-medium text-brand-amber">39,46%</td><td class="px-4 py-3 text-right">35.230</td><td class="px-4 py-3 text-right font-bold text-brand-green">17,94%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Berdasarkan Kode Produk -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-tags text-brand-blue mr-2"></i> Pencapaian %OF berdasarkan Kode Produk (SKU)</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full table-modern">
+                            <thead><tr><th class="px-4 py-3 text-left">Bulan</th><th class="px-4 py-3 text-left">Kode Produk</th><th class="px-4 py-3 text-right">Target (BN)</th><th class="px-4 py-3 text-right">Jml BPP</th><th class="px-4 py-3 text-right">%BPP</th><th class="px-4 py-3 text-right">Jml Rilis</th><th class="px-4 py-3 text-right">%Rilis</th><th class="px-4 py-3 text-right">Jml Shipping</th><th class="px-4 py-3 text-right">%Shipping</th></tr></thead>
+                            <tbody>
+                                <tr><td class="px-4 py-3">Sep 2026</td><td class="px-4 py-3 font-medium">VCPTB</td><td class="px-4 py-3 text-right">2</td><td class="px-4 py-3 text-right">2</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">2</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right font-medium text-brand-green">50%</td></tr>
+                                <tr><td class="px-4 py-3">Sep 2026</td><td class="px-4 py-3 font-medium">VDXBA</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">0</td><td class="px-4 py-3 text-right">0%</td><td class="px-4 py-3 text-right">0</td><td class="px-4 py-3 text-right font-medium text-slate-400">0%</td></tr>
+                                <tr><td class="px-4 py-3">Sep 2026</td><td class="px-4 py-3 font-medium">VCATA</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">0</td><td class="px-4 py-3 text-right">0%</td><td class="px-4 py-3 text-right">0</td><td class="px-4 py-3 text-right font-medium text-slate-400">0%</td></tr>
+                                <tr><td class="px-4 py-3">Sep 2026</td><td class="px-4 py-3 font-medium">VMTTB</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">1</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">0</td><td class="px-4 py-3 text-right font-medium text-slate-400">0%</td></tr>
+                                <tr class="bg-slate-50 font-bold"><td class="px-4 py-3" colspan="2">TOTAL</td><td class="px-4 py-3 text-right">51</td><td class="px-4 py-3 text-right">51</td><td class="px-4 py-3 text-right">100%</td><td class="px-4 py-3 text-right">28</td><td class="px-4 py-3 text-right">54,9%</td><td class="px-4 py-3 text-right">22</td><td class="px-4 py-3 text-right text-brand-green">43,14%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- END TAB DASHBOARD -->
+
+        <!-- ================= TAB UPLOAD ================= -->
+        <div id="tab-upload" class="hidden tab-content">
+            <div class="max-w-2xl mx-auto mt-10 bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-slate-100 text-center">
+                <div class="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-brand-teal"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">Upload Data Excel</h2>
+                
+                <!-- BAGIAN FORMAT HEADER SUDAH DIHAPUS -->
+
+                <div class="mt-8 border-2 border-dashed border-slate-300 rounded-2xl p-10 cursor-pointer hover:border-brand-teal hover:bg-teal-50/30 transition-all duration-300 group" onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
+                    <i class="fa-solid fa-file-excel text-4xl text-green-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                    <p class="font-semibold text-slate-700">Klik untuk memilih file</p>
+                    <p class="text-xs text-slate-400 mt-1">atau drag and drop file ke sini</p>
+                </div>
+
+                <div id="fileInfo" class="hidden mt-4 bg-blue-50 text-blue-700 p-3 rounded-xl text-sm border border-blue-200 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-check"></i> File terpilih: <span id="fileName" class="font-bold"></span>
+                </div>
+
+                <button onclick="uploadData()" class="mt-8 w-full bg-brand-teal text-white font-bold py-4 rounded-xl hover:bg-teal-800 transition-all duration-300 shadow-lg shadow-teal-500/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-upload"></i> Proses Upload
+                </button>
+            </div>
+        </div> <!-- END TAB UPLOAD -->
+
+    </main>
+
+    <script>
+        // --- 1. Logika Navigasi Tab ---
+        function switchTab(tabName) {
+            document.getElementById('tab-dashboard').classList.add('hidden');
+            document.getElementById('tab-upload').classList.add('hidden');
+            
+            const navDash = document.getElementById('nav-dashboard');
+            const navUpload = document.getElementById('nav-upload');
+
+            // Reset classes
+            navDash.className = "flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 text-white hover:bg-white/10";
+            navUpload.className = "flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 text-white hover:bg-white/10";
+
+            if(tabName === 'dashboard') {
+                document.getElementById('tab-dashboard').classList.remove('hidden');
+                navDash.className = "flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-white text-brand-teal shadow-sm";
+            } else {
+                document.getElementById('tab-upload').classList.remove('hidden');
+                navUpload.className = "flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-white text-brand-teal shadow-sm";
+            }
+        }
+
+        // --- 2. Logika Upload File (Simulasi) ---
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name;
+            if(fileName) {
+                document.getElementById('fileName').textContent = fileName;
+                document.getElementById('fileInfo').classList.remove('hidden');
+            }
+        });
+
+        function uploadData() {
+            const fileInput = document.getElementById('fileInput');
+            if(fileInput.files.length === 0) {
+                alert("Silakan pilih file terlebih dahulu!");
+                return;
+            }
+            alert("Berhasil! File " + fileInput.files[0].name + " sedang diproses.\n\n(Data akan diupdate ke Dashboard)");
+            fileInput.value = '';
+            document.getElementById('fileInfo').classList.add('hidden');
+            switchTab('dashboard');
+        }
+
+        // --- 3. Inisialisasi Grafik (Chart.js) ---
+        document.addEventListener('DOMContentLoaded', function() {
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.color = '#64748b';
+
+            new Chart(document.getElementById('chartOF'), {
+                type: 'line',
+                data: {
+                    labels: ['Sep 2026'],
+                    datasets: [{
+                        label: '%OF',
+                        data: [36.25],
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#f97316',
+                        pointBorderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 40, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
+                }
+            });
+
+            new Chart(document.getElementById('chartRilis'), {
+                type: 'bar',
+                data: {
+                    labels: ['31 Agu', '1 Sep', '2 Sep', '4 Sep', '7 Sep', '8 Sep', '9 Sep', '11 Sep', '14 Sep', '15 Sep'],
+                    datasets: [
+                        { label: 'BN Sudah Rilis', data: [4, 2, 2, 1, 7, 5, 5, 1, 7, 2], backgroundColor: '#fcd34d', borderRadius: 4, yAxisID: 'y' },
+                        { label: 'Total BN', data: [4, 6, 8, 9, 16, 21, 26, 27, 34, 36], type: 'line', borderColor: '#0284c7', backgroundColor: '#0284c7', borderWidth: 3, pointRadius: 4, tension: 0.3, yAxisID: 'y1' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 40, position: 'left', grid: { display: false } }, y1: { beginAtZero: true, max: 8, position: 'right', grid: { display: false } }, x: { grid: { display: false } } }
+                }
+            });
+
+            new Chart(document.getElementById('chartBatch'), {
+                type: 'bar',
+                data: {
+                    labels: ['W1', 'W2', 'W3', 'W4', 'W5'],
+                    datasets: [
+                        { label: 'Target', data: [9, 18, 16, 22, 15], backgroundColor: '#ef4444', borderRadius: 4 },
+                        { label: 'Sudah BPP', data: [9, 18, 16, 16, 0], backgroundColor: '#fcd34d', borderRadius: 4 },
+                        { label: 'Sudah Rilis', data: [9, 18, 9, 0, 0], backgroundColor: '#10b981', borderRadius: 4 },
+                        { label: 'Sudah Shipping', data: [7, 17, 5, 0, 0], backgroundColor: '#0284c7', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 40, grid: { display: false } }, x: { grid: { display: false } } }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
