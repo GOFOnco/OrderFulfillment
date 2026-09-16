@@ -36,6 +36,9 @@
         .filter-select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
         .drag-over { border-color: #0f766e !important; background-color: #f0fdfa !important; border-style: solid !important; }
         .log-box { max-height: 220px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 11px; background: #0f172a; color: #7dd3fc; padding: 10px; border-radius: 8px; line-height: 1.5; }
+        .preview-table { font-size: 11px; border-collapse: collapse; width: 100%; }
+        .preview-table th, .preview-table td { padding: 5px 8px; border: 1px solid #e2e8f0; white-space: nowrap; }
+        .preview-table th { background: #fef3c7; font-weight: 600; color: #92400e; }
     </style>
 </head>
 <body class="p-4 md:p-6 lg:p-8 min-h-screen">
@@ -228,14 +231,16 @@
 
         <!-- TAB UPLOAD -->
         <div id="tab-upload" class="hidden tab-content">
-            <div class="max-w-3xl mx-auto mt-10 bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-slate-100 text-center">
-                <div class="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-brand-teal"></i>
+            <div class="max-w-4xl mx-auto mt-6 bg-white p-8 md:p-10 rounded-3xl shadow-xl border border-slate-100">
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-cloud-arrow-up text-4xl text-brand-teal"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-800">Upload Data Excel / CSV</h2>
+                    <p class="text-slate-500 text-sm mt-2">Pilih sheet yang berisi data BATCH (bukan sheet PIVOT/ringkasan).</p>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-800">Upload Data Excel / CSV</h2>
-                <p class="text-slate-500 text-sm mt-2">Header bisa di baris mana saja — sistem akan otomatis mendeteksi.</p>
 
-                <div id="dropZone" class="mt-8 border-2 border-dashed border-slate-300 rounded-2xl p-10 cursor-pointer hover:border-brand-teal hover:bg-teal-50/30 transition-all duration-300 group">
+                <div id="dropZone" class="mt-6 border-2 border-dashed border-slate-300 rounded-2xl p-8 cursor-pointer hover:border-brand-teal hover:bg-teal-50/30 transition-all duration-300 group text-center">
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
                     <i class="fa-solid fa-file-excel text-4xl text-green-600 mb-3 group-hover:scale-110 transition-transform pointer-events-none"></i>
                     <p class="font-semibold text-slate-700 pointer-events-none">Klik untuk memilih file</p>
@@ -246,7 +251,27 @@
                     <i class="fa-solid fa-circle-check"></i> File terpilih: <span id="fileName" class="font-bold"></span>
                 </div>
 
-                <button type="button" id="btnUpload" onclick="processUpload()" class="mt-8 w-full bg-brand-teal text-white font-bold py-4 rounded-xl hover:bg-teal-800 transition-all duration-300 shadow-lg shadow-teal-500/30 flex items-center justify-center gap-2 opacity-50 cursor-not-allowed" disabled>
+                <!-- PANEL PILIH SHEET -->
+                <div id="sheetPanel" class="hidden mt-6 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        <i class="fa-solid fa-table-list text-brand-teal"></i> Pilih Sheet yang berisi data BATCH:
+                    </label>
+                    <select id="sheetSelect" class="filter-select w-full bg-white border border-slate-300 px-3 py-2.5 rounded-lg text-sm text-slate-700 outline-none" onchange="previewSheet()">
+                        <option value="">-- Pilih Sheet --</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-2">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i> Tips: pilih sheet dengan kolom <b>Bulan, Produk, BATCH No., BPP Date</b>. Hindari sheet "PIVOT"/"Target".
+                    </p>
+
+                    <div id="previewBox" class="hidden mt-4">
+                        <p class="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">Preview 5 baris pertama:</p>
+                        <div class="overflow-x-auto bg-white rounded-lg border border-slate-200 p-2">
+                            <table class="preview-table" id="previewTable"></table>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" id="btnUpload" onclick="processUpload()" class="mt-6 w-full bg-brand-teal text-white font-bold py-4 rounded-xl hover:bg-teal-800 transition-all duration-300 shadow-lg shadow-teal-500/30 flex items-center justify-center gap-2 opacity-50 cursor-not-allowed" disabled>
                     <i class="fa-solid fa-upload"></i> Proses Upload
                 </button>
 
@@ -266,6 +291,7 @@
         var filteredData = [];
         var charts = { of: null, rilis: null, batch: null };
         var selectedFile = null;
+        var workbookCache = null;
 
         // ===== LOGGER =====
         function log(msg, type) {
@@ -306,16 +332,10 @@
         });
         fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
         ['dragenter', 'dragover'].forEach(function(ev) {
-            dropZone.addEventListener(ev, function(e) {
-                e.preventDefault(); e.stopPropagation();
-                dropZone.classList.add('drag-over');
-            }, false);
+            dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag-over'); }, false);
         });
         ['dragleave', 'drop'].forEach(function(ev) {
-            dropZone.addEventListener(ev, function(e) {
-                e.preventDefault(); e.stopPropagation();
-                dropZone.classList.remove('drag-over');
-            }, false);
+            dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drag-over'); }, false);
         });
         dropZone.addEventListener('drop', function(e) {
             var files = e.dataTransfer.files;
@@ -325,13 +345,101 @@
         function handleFile(file) {
             if (!file) return;
             selectedFile = file;
+            workbookCache = null;
             document.getElementById('fileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
             document.getElementById('fileInfo').classList.remove('hidden');
+            document.getElementById('logBox').innerHTML = '';
+            log('File terpilih: ' + file.name, 'info');
+
+            // Baca workbook untuk populate sheet dropdown
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var data = new Uint8Array(e.target.result);
+                    workbookCache = XLSX.read(data, { type: 'array' });
+                    var names = workbookCache.SheetNames;
+                    log('Sheet tersedia: ' + names.join(', '), 'info');
+
+                    var sel = document.getElementById('sheetSelect');
+                    sel.innerHTML = '<option value="">-- Pilih Sheet --</option>' + names.map(function(n) {
+                        return '<option value="' + n + '">' + n + '</option>';
+                    }).join('');
+
+                    // Auto-pilih sheet yang paling mungkin
+                    var candidates = ['Est OF', 'Reg Release', 'Est FG', 'Plan Qty', 'Delivery Report', 'Master Item'];
+                    var autoPick = '';
+                    for (var i = 0; i < candidates.length; i++) {
+                        if (names.indexOf(candidates[i]) !== -1) { autoPick = candidates[i]; break; }
+                    }
+                    if (!autoPick) {
+                        for (var j = 0; j < names.length; j++) {
+                            var lower = names[j].toLowerCase();
+                            if (lower.indexOf('pivot') === -1 && lower.indexOf('target') === -1 && lower.indexOf('value') === -1) {
+                                autoPick = names[j]; break;
+                            }
+                        }
+                    }
+                    if (autoPick) {
+                        sel.value = autoPick;
+                        log('Auto-pilih sheet: "' + autoPick + '" (bisa diubah)', 'info');
+                        previewSheet();
+                    }
+
+                    document.getElementById('sheetPanel').classList.remove('hidden');
+                } catch (err) {
+                    log('Gagal baca file: ' + err.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ===== PREVIEW SHEET =====
+        function previewSheet() {
+            var sheetName = document.getElementById('sheetSelect').value;
+            var previewBox = document.getElementById('previewBox');
+            var previewTable = document.getElementById('previewTable');
+            if (!sheetName || !workbookCache) {
+                previewBox.classList.add('hidden');
+                document.getElementById('btnUpload').disabled = true;
+                document.getElementById('btnUpload').classList.add('opacity-50', 'cursor-not-allowed');
+                return;
+            }
+
+            var sheet = workbookCache.Sheets[sheetName];
+            var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
+
+            if (rows.length === 0) {
+                previewTable.innerHTML = '<tr><td>Sheet kosong</td></tr>';
+                previewBox.classList.remove('hidden');
+                return;
+            }
+
+            // Tampilkan 6 baris pertama (header + 5 data)
+            var maxRows = Math.min(rows.length, 6);
+            var maxCols = 0;
+            for (var i = 0; i < maxRows; i++) {
+                if (rows[i] && rows[i].length > maxCols) maxCols = rows[i].length;
+            }
+            maxCols = Math.min(maxCols, 12); // batasi 12 kolom untuk tampilan
+
+            var html = '';
+            for (var r = 0; r < maxRows; r++) {
+                html += '<tr>';
+                var row = rows[r] || [];
+                for (var c = 0; c < maxCols; c++) {
+                    var val = row[c] !== undefined ? String(row[c]) : '';
+                    if (val.length > 25) val = val.substring(0, 25) + '...';
+                    var tag = (r === 0) ? 'th' : 'td';
+                    html += '<' + tag + '>' + val + '</' + tag + '>';
+                }
+                html += '</tr>';
+            }
+            previewTable.innerHTML = html;
+            previewBox.classList.remove('hidden');
+
             var btn = document.getElementById('btnUpload');
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
-            document.getElementById('logBox').innerHTML = '';
-            log('File terpilih: ' + file.name, 'info');
         }
 
         // ===== AUTO-DETECT HEADER =====
@@ -358,108 +466,89 @@
 
         // ===== UPLOAD LOGIC =====
         function processUpload() {
-            if (!selectedFile) { log('Pilih file terlebih dahulu!', 'error'); return; }
-            if (typeof XLSX === 'undefined') { log('Library Excel belum termuat. Cek koneksi.', 'error'); return; }
+            var sheetName = document.getElementById('sheetSelect').value;
+            if (!sheetName) { log('Pilih sheet terlebih dahulu!', 'error'); return; }
+            if (!workbookCache) { log('Workbook belum terbaca.', 'error'); return; }
 
-            var reader = new FileReader();
-            reader.onerror = function() { log('Gagal membaca file.', 'error'); };
+            try {
+                var sheet = workbookCache.Sheets[sheetName];
+                var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
+                log('Memproses sheet "' + sheetName + '": ' + rows.length + ' baris', 'info');
 
-            reader.onload = function(e) {
-                try {
-                    var data = new Uint8Array(e.target.result);
-                    var workbook = XLSX.read(data, { type: 'array' });
-                    log('File terbaca. Sheet tersedia: ' + workbook.SheetNames.join(', '), 'info');
+                if (rows.length === 0) { log('Sheet kosong.', 'error'); return; }
 
-                    var parsedData = [];
-                    var foundSheet = '';
-                    var headerRowNum = -1;
-
-                    for (var s = 0; s < workbook.SheetNames.length; s++) {
-                        var sheetName = workbook.SheetNames[s];
-                        var sheet = workbook.Sheets[sheetName];
-                        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
-                        log('Sheet "' + sheetName + '": ' + rows.length + ' baris', 'info');
-
-                        if (rows.length === 0) continue;
-
-                        var headerInfo = findHeaderRow(rows);
-                        log('  → Header terdeteksi di baris ke-' + (headerInfo.row + 1) + ' (score: ' + headerInfo.score + ')', 'info');
-
-                        if (headerInfo.score >= 2) {
-                            var headers = rows[headerInfo.row].map(function(h) { return String(h || '').trim(); });
-                            log('  → Header: ' + headers.filter(function(h){return h;}).slice(0, 15).join(' | '), 'success');
-
-                            for (var r = headerInfo.row + 1; r < rows.length; r++) {
-                                var rowArr = rows[r];
-                                if (!rowArr || rowArr.length === 0) continue;
-                                var allEmpty = true;
-                                for (var c = 0; c < rowArr.length; c++) {
-                                    if (rowArr[c] !== '' && rowArr[c] !== null && rowArr[c] !== undefined) { allEmpty = false; break; }
-                                }
-                                if (allEmpty) continue;
-
-                                var obj = {};
-                                for (var h = 0; h < headers.length; h++) {
-                                    if (headers[h]) obj[headers[h]] = rowArr[h] !== undefined ? rowArr[h] : '';
-                                }
-                                parsedData.push(obj);
-                            }
-
-                            if (parsedData.length > 0) { foundSheet = sheetName; headerRowNum = headerInfo.row; break; }
-                        }
-                    }
-
-                    if (parsedData.length === 0) {
-                        log('❌ Tidak ada data yang bisa dibaca di semua sheet.', 'error');
-                        log('💡 Tips: Pastikan salah satu sheet punya header dengan kata "Bulan", "Produk", atau "BATCH".', 'warn');
-                        return;
-                    }
-
-                    log('✅ Berhasil baca ' + parsedData.length + ' baris data dari sheet "' + foundSheet + '" (header di baris ' + (headerRowNum + 1) + ')', 'success');
-
-                    // Helper ambil nilai dari beberapa kemungkinan nama kolom
-                    function getVal(row, keys) {
-                        // Normalisasi key: lowercase, hapus spasi/titik
-                        var normalized = {};
-                        Object.keys(row).forEach(function(k) {
-                            var nk = k.toLowerCase().replace(/[.\s_]/g, '');
-                            normalized[nk] = row[k];
-                        });
-                        for (var i = 0; i < keys.length; i++) {
-                            var nk = keys[i].toLowerCase().replace(/[.\s_]/g, '');
-                            if (normalized[nk] !== undefined && normalized[nk] !== '') return normalized[nk];
-                        }
-                        return "";
-                    }
-
-                    rawData = parsedData.map(function(row, index) {
-                        return {
-                            id: index,
-                            bulan: String(getVal(row, ["Bulan", "bulan", "Month"]) || "-"),
-                            produk: String(getVal(row, ["Produk", "produk", "Product", "Kode Produk", "SKU"]) || "-"),
-                            batch: String(getVal(row, ["BATCH No.", "BATCH No", "Batch", "BATCH", "No Batch", "BatchNo"]) || "-"),
-                            estFg: String(getVal(row, ["Est FG", "EstFG"]) || "-"),
-                            planQty: parseFloat(getVal(row, ["Plan Qty", "PlanQty", "Target"])) || 0,
-                            bppDate: String(getVal(row, ["BPP Date", "BPPDate", "Tgl BPP"]) || ""),
-                            bppQty: parseFloat(getVal(row, ["BPP Qty", "BPPQty", "Qty BPP"])) || 0,
-                            releaseDate: String(getVal(row, ["Release Date", "ReleaseDate", "Tgl Release"]) || ""),
-                            releaseQty: parseFloat(getVal(row, ["Release Qty", "ReleaseQty", "Qty Rilis"])) || 0,
-                            shippingDate: String(getVal(row, ["Shipping Date", "ShippingDate", "Tgl Shipping"]) || ""),
-                            shippingQty: parseFloat(getVal(row, ["Shipping Qty", "ShippingQty", "Qty Shipping"])) || 0
-                        };
-                    });
-
-                    log('Contoh data pertama: ' + JSON.stringify(rawData[0]), 'info');
-
-                    populateFilters();
-                    resetFilters();
-                    log('✅ Data berhasil dimuat ke dashboard!', 'success');
-                } catch (err) {
-                    log('❌ Error: ' + err.message, 'error');
-                    console.error(err);
+                var headerInfo = findHeaderRow(rows);
+                if (headerInfo.score < 2) {
+                    log('❌ Header tidak terdeteksi. Pastikan ada kolom "Bulan", "Produk", atau "BATCH".', 'error');
+                    return;
                 }
-            };
-            reader.readAsArrayBuffer(selectedFile);
+
+                var headers = rows[headerInfo.row].map(function(h) { return String(h || '').trim(); });
+                log('Header di baris ' + (headerInfo.row + 1) + ': ' + headers.filter(function(h){return h;}).slice(0, 15).join(' | '), 'success');
+
+                var parsedData = [];
+                for (var r = headerInfo.row + 1; r < rows.length; r++) {
+                    var rowArr = rows[r];
+                    if (!rowArr || rowArr.length === 0) continue;
+                    var allEmpty = true;
+                    for (var c = 0; c < rowArr.length; c++) {
+                        if (rowArr[c] !== '' && rowArr[c] !== null && rowArr[c] !== undefined) { allEmpty = false; break; }
+                    }
+                    if (allEmpty) continue;
+
+                    var obj = {};
+                    for (var h = 0; h < headers.length; h++) {
+                        if (headers[h]) obj[headers[h]] = rowArr[h] !== undefined ? rowArr[h] : '';
+                    }
+                    parsedData.push(obj);
+                }
+
+                if (parsedData.length === 0) { log('❌ Tidak ada data baris.', 'error'); return; }
+
+                // Helper ambil nilai
+                function getVal(row, keys) {
+                    var normalized = {};
+                    Object.keys(row).forEach(function(k) {
+                        var nk = k.toLowerCase().replace(/[.\s_]/g, '');
+                        normalized[nk] = row[k];
+                    });
+                    for (var i = 0; i < keys.length; i++) {
+                        var nk = keys[i].toLowerCase().replace(/[.\s_]/g, '');
+                        if (normalized[nk] !== undefined && normalized[nk] !== '') return normalized[nk];
+                    }
+                    return "";
+                }
+
+                rawData = parsedData.map(function(row, index) {
+                    return {
+                        id: index,
+                        bulan: String(getVal(row, ["Bulan", "bulan", "Month"]) || "-"),
+                        produk: String(getVal(row, ["Produk", "produk", "Product", "Kode Produk", "SKU"]) || "-"),
+                        batch: String(getVal(row, ["BATCH No.", "BATCH No", "Batch", "BATCH", "No Batch", "BatchNo"]) || "-"),
+                        estFg: String(getVal(row, ["Est FG", "EstFG"]) || "-"),
+                        planQty: parseFloat(getVal(row, ["Plan Qty", "PlanQty", "Target"])) || 0,
+                        bppDate: String(getVal(row, ["BPP Date", "BPPDate", "Tgl BPP"]) || ""),
+                        bppQty: parseFloat(getVal(row, ["BPP Qty", "BPPQty", "Qty BPP"])) || 0,
+                        releaseDate: String(getVal(row, ["Release Date", "ReleaseDate", "Tgl Release"]) || ""),
+                        releaseQty: parseFloat(getVal(row, ["Release Qty", "ReleaseQty", "Qty Rilis"])) || 0,
+                        shippingDate: String(getVal(row, ["Shipping Date", "ShippingDate", "Tgl Shipping"]) || ""),
+                        shippingQty: parseFloat(getVal(row, ["Shipping Qty", "ShippingQty", "Qty Shipping"])) || 0
+                    };
+                });
+
+                log('Contoh data pertama: ' + JSON.stringify(rawData[0]), 'info');
+                log('✅ Berhasil baca ' + rawData.length + ' baris dari sheet "' + sheetName + '"', 'success');
+
+                populateFilters();
+                resetFilters();
+                log('✅ Data dimuat ke Dashboard!', 'success');
+
+                // Auto pindah ke dashboard
+                setTimeout(function() { switchTab('dashboard'); }, 800);
+            } catch (err) {
+                log('❌ Error: ' + err.message, 'error');
+                console.error(err);
+            }
         }
 
         // ===== POPULATE FILTERS =====
